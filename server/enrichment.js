@@ -67,36 +67,32 @@ function extractEmails(html) {
  * Automatically discover the company's public website.
  *
  * Requires:
- * BING_SEARCH_API_KEY
+ * TAVILY_API_KEY
  */
 async function discoverWebsite(companyName) {
-  const key = process.env.BING_SEARCH_API_KEY;
+  const key = process.env.TAVILY_API_KEY;
 
   if (!key) {
     return null;
   }
 
-  const params = new URLSearchParams({
-    q: `"${companyName}" UK official website`,
-    count: "5",
-    responseFilter: "Webpages",
-    safeSearch: "Moderate"
-  });
-
   try {
-    const response = await fetch(
-      `https://api.bing.microsoft.com/v7.0/search?${params}`,
-      {
-        headers: {
-          "Ocp-Apim-Subscription-Key": key
-        },
-        signal: AbortSignal.timeout(8000)
-      }
-    );
+    const response = await fetch("https://api.tavily.com/search", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`
+      },
+      body: JSON.stringify({
+        query: `"${companyName}" UK official website`,
+        max_results: 5
+      }),
+      signal: AbortSignal.timeout(8000)
+    });
 
     if (!response.ok) {
       console.error(
-        "Bing search failed:",
+        "Tavily search failed:",
         response.status
       );
 
@@ -105,7 +101,7 @@ async function discoverWebsite(companyName) {
 
     const data = await response.json();
 
-    const pages = data.webPages?.value || [];
+    const pages = data.results || [];
 
     for (const page of pages) {
       const url = normaliseUrl(page.url);
