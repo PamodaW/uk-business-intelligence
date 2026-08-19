@@ -49,11 +49,21 @@ function extractEmails(html) {
     }
   });
 
-  // Find visible email addresses
-  const text = $("body").text(" ");
+  // Find visible email addresses. Cheerio's .text() concatenates
+  // descendant text nodes with no separator, so adjacent block elements
+  // (e.g. an email in one <p> followed by "Call us" in the next) can run
+  // together into one token - insert a space after block-level elements
+  // first so the regex doesn't merge unrelated text into the match.
+  $("br, p, div, li, td, tr, h1, h2, h3, h4, h5, h6, section, footer, header").each(
+    (_, el) => {
+      $(el).append(" ");
+    },
+  );
+
+  const text = $("body").text();
 
   const matches =
-    text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+    text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,24}\b/gi) || [];
 
   for (const email of matches) {
     found.add(email.toLowerCase());
@@ -105,6 +115,8 @@ const directoryDomains = [
   "glassdoor.com",
   "indeed.com",
   "companieshouse.gov.uk",
+  "companiesinsight.com",
+  "bringo.co.uk",
 ];
 
 function coreCompanyWords(companyName) {
@@ -117,15 +129,21 @@ function coreCompanyWords(companyName) {
     .filter((w) => w.length > 2);
 }
 
-function looksRelevant(companyName, page) {
+// A directory/aggregator site will mention the company name in its listing
+// content just as readily as the company's real site would, so matching on
+// page content is unreliable. A company's own domain, though, almost always
+// contains a fragment of its actual name (tesco.com, octopusenergy.group) -
+// directory domains never do, since they host thousands of unrelated
+// companies. Require that instead.
+function domainMatchesCompany(hostname, companyName) {
+  const sld = hostname.replace(/^www\./, "").split(".")[0];
   const words = coreCompanyWords(companyName);
 
   if (!words.length) return true;
 
-  const haystack = `${page.title || ""} ${page.content || ""}`.toLowerCase();
-  const matches = words.filter((w) => haystack.includes(w));
-
-  return matches.length >= Math.ceil(words.length * 0.6);
+  return words.some(
+    (w) => w.length >= 4 && (sld.includes(w) || w.includes(sld)),
+  );
 }
 
 /*
@@ -181,8 +199,8 @@ async function discoverWebsite(companyName) {
         continue;
       }
 
-      // Skip results that don't actually mention the company
-      if (!looksRelevant(companyName, page)) {
+      // Skip results whose domain doesn't actually relate to the company
+      if (!domainMatchesCompany(hostname, companyName)) {
         continue;
       }
 

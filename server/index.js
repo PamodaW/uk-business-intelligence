@@ -15,10 +15,12 @@ const clientDist = path.resolve(__dirname, "../client/dist");
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
 app.use(express.json({ limit: "1mb" }));
 
+const nonEnglandWalesPrefixes = ["SC", "SO", "SF", "SG", "SL", "SZ", "NI", "NC", "NL"];
+
 db.prepare("DELETE FROM companies WHERE company_number LIKE 'DEMO-%'").run();
 db.prepare(
-  "DELETE FROM companies WHERE company_number LIKE 'SC%' OR company_number LIKE 'SO%' OR company_number LIKE 'NI%' OR company_number LIKE 'NC%'",
-).run();
+  `DELETE FROM companies WHERE ${nonEnglandWalesPrefixes.map(() => "company_number LIKE ?").join(" OR ")}`,
+).run(...nonEnglandWalesPrefixes.map((p) => `${p}%`));
 
 function mapApiCompany(x) {
   const name = x.company_name || x.title || "";
@@ -148,7 +150,7 @@ app.post("/api/companies/sync", async (req, res) => {
     );
     const mapped = (data.items || [])
       .map(mapApiCompany)
-      .filter((x) => !/^(SC|SO|NI|NC)/i.test(x.company_number));
+      .filter((x) => !new RegExp(`^(${nonEnglandWalesPrefixes.join("|")})`, "i").test(x.company_number));
     tx(mapped);
     res.json({ imported: mapped.length, items: mapped });
   } catch (e) {
