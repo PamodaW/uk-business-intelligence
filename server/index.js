@@ -15,49 +15,7 @@ const clientDist = path.resolve(__dirname, "../client/dist");
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
 app.use(express.json({ limit: "1mb" }));
 
-const demo = [
-  [
-    "AITIOM LTD",
-    "Technology",
-    "2026-08-03",
-    "AI and digital technology solutions",
-    "London",
-  ],
-  [
-    "LIVESHOPHQ LTD",
-    "Retail / E-commerce",
-    "2026-08-03",
-    "Live shopping and e-commerce services",
-    "London",
-  ],
-  [
-    "NOBLE JOINERY SERVICES LTD",
-    "Other",
-    "2026-08-03",
-    "Joinery and bespoke woodworking services",
-    "England",
-  ],
-  [
-    "TAEVORA RESIDENTIAL SURVEYING LTD",
-    "Property",
-    "2026-08-03",
-    "Residential property surveying services",
-    "England",
-  ],
-  [
-    "PAK TRAVEL & TOURS LTD",
-    "Travel / Hospitality",
-    "2026-08-03",
-    "Travel planning and tour services",
-    "England",
-  ],
-];
-const seed = db.prepare(`INSERT OR IGNORE INTO companies
-(company_number,company_name,category,incorporation_date,notes,address,lead_score)
-VALUES (?,?,?,?,?,?,?)`);
-demo.forEach((d, i) =>
-  seed.run(`DEMO-${i + 1}`, d[0], d[1], d[2], d[3], d[4], 50),
-);
+db.prepare("DELETE FROM companies WHERE company_number LIKE 'DEMO-%'").run();
 
 function mapApiCompany(x) {
   const name = x.company_name || x.title || "";
