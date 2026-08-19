@@ -60,14 +60,21 @@ demo.forEach((d, i) =>
 );
 
 function mapApiCompany(x) {
+  const name = x.company_name || x.title || "";
+  const addr = x.registered_office_address;
+  const address = addr
+    ? [addr.address_line_1, addr.address_line_2, addr.locality, addr.postal_code]
+        .filter(Boolean)
+        .join(", ")
+    : [x.address_snippet].filter(Boolean).join("");
   return {
     company_number: x.company_number,
-    company_name: x.title,
+    company_name: name,
     status: x.company_status || "",
     incorporation_date: x.date_of_creation || "",
     sic_codes: JSON.stringify(x.sic_codes || []),
-    address: [x.address_snippet].filter(Boolean).join(""),
-    category: inferCategory((x.sic_codes || []).join(" ") + " " + x.title),
+    address,
+    category: inferCategory((x.sic_codes || []).join(" ") + " " + name),
   };
 }
 function inferCategory(text) {

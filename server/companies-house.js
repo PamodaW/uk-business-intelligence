@@ -7,11 +7,12 @@ function authHeader() {
 }
 
 export async function searchCompanies({ q="", from="", to="", limit=50 }) {
-  const params = new URLSearchParams({ q, items_per_page: String(Math.min(Number(limit)||50,100)) });
+  const params = new URLSearchParams({ size: String(Math.min(Number(limit)||50,100)) });
+  if (q) params.set("company_name_includes", q);
   if (from) params.set("incorporated_from", from);
   if (to) params.set("incorporated_to", to);
 
-  const response = await fetch(`${BASE}/search/companies?${params}`, {
+  const response = await fetch(`${BASE}/advanced-search/companies?${params}`, {
     headers: { Authorization: authHeader(), Accept: "application/json" }
   });
   if (!response.ok) throw new Error(`Companies House search failed: ${response.status}`);

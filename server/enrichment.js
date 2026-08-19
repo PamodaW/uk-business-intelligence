@@ -63,6 +63,65 @@ function extractEmails(html) {
 }
 
 
+const directoryDomains = [
+  "bing.com",
+  "google.",
+  "facebook.com",
+  "instagram.com",
+  "linkedin.com",
+  "youtube.com",
+  "yelp.",
+  "yellowpages.",
+  "endole.co.uk",
+  "companiesintheuk.co.uk",
+  "opencorporates.com",
+  "checkcompanyhouse.co.uk",
+  "bizdb.co.uk",
+  "bizlead.co.uk",
+  "dnb.com",
+  "cheapaccounting.co.uk",
+  "companycheck.co.uk",
+  "192.com",
+  "thecompanywarehouse.co.uk",
+  "corpwatch.org",
+  "redflagalert.com",
+  "creditsafe.com",
+  "duedil.com",
+  "gov.uk",
+  "wikipedia.org",
+  "wikidata.org",
+  "crunchbase.com",
+  "bloomberg.com",
+  "reuters.com",
+  "forbes.com",
+  "ft.com",
+  "trustpilot.com",
+  "glassdoor.com",
+  "indeed.com",
+  "companieshouse.gov.uk",
+];
+
+function coreCompanyWords(companyName) {
+  return companyName
+    .toLowerCase()
+    .replace(/\b(ltd|limited|llp|plc|the|and|co|company)\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((w) => w.length > 2);
+}
+
+function looksRelevant(companyName, page) {
+  const words = coreCompanyWords(companyName);
+
+  if (!words.length) return true;
+
+  const haystack = `${page.title || ""} ${page.content || ""}`.toLowerCase();
+  const matches = words.filter((w) => haystack.includes(w));
+
+  return matches.length >= Math.ceil(words.length * 0.6);
+}
+
 /*
  * Automatically discover the company's public website.
  *
@@ -111,17 +170,13 @@ async function discoverWebsite(companyName) {
       const hostname =
         new URL(url).hostname.toLowerCase();
 
-      // Don't treat social media/search engines as the company website
-      if (
-        hostname.includes("bing.com") ||
-        hostname.includes("google.") ||
-        hostname.includes("facebook.com") ||
-        hostname.includes("instagram.com") ||
-        hostname.includes("linkedin.com") ||
-        hostname.includes("youtube.com") ||
-        hostname.includes("yelp.") ||
-        hostname.includes("yellowpages.")
-      ) {
+      // Don't treat social media/search engines/company directories as the company website
+      if (directoryDomains.some((d) => hostname.includes(d))) {
+        continue;
+      }
+
+      // Skip results that don't actually mention the company
+      if (!looksRelevant(companyName, page)) {
         continue;
       }
 
