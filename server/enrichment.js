@@ -4,8 +4,14 @@ const commonPaths = [
   "",
   "/contact",
   "/contact-us",
+  "/get-in-touch",
   "/about",
-  "/about-us"
+  "/about-us",
+  "/team",
+  "/support",
+  "/privacy-policy",
+  "/privacy",
+  "/terms"
 ];
 
 function normaliseUrl(value) {
@@ -194,6 +200,51 @@ async function discoverWebsite(companyName) {
 
 
 /*
+ * Fallback: look up publicly-indexed emails for a domain via Hunter.io,
+ * for cases where the site itself only offers a contact form.
+ *
+ * Requires:
+ * HUNTER_API_KEY
+ */
+async function hunterDomainSearch(domain) {
+  const key = process.env.HUNTER_API_KEY;
+
+  if (!key || !domain) {
+    return null;
+  }
+
+  try {
+    const params = new URLSearchParams({ domain, api_key: key, limit: "10" });
+
+    const response = await fetch(
+      `https://api.hunter.io/v2/domain-search?${params}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+
+    if (!response.ok) {
+      console.error("Hunter domain search failed:", response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    const emails = data.data?.emails || [];
+
+    if (!emails.length) return null;
+
+    const generic = emails.find((e) => e.type === "generic");
+    const best =
+      generic ||
+      [...emails].sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+
+    return best?.value || null;
+  } catch (error) {
+    console.error("Hunter domain search error:", error.message);
+  }
+
+  return null;
+}
+
+/*
  * Main enrichment function
  */
 export async function enrichWebsite(
@@ -270,6 +321,28 @@ export async function enrichWebsite(
     } catch (error) {
       // Continue checking other pages
     }
+  }
+
+  /*
+   * The site itself didn't expose an email (common for sites that only
+   * offer a contact form). Fall back to a publicly-indexed email lookup.
+   */
+  const domain = new URL(discoveredWebsite).hostname.replace(/^www\./, "");
+  const hunterEmail = await hunterDomainSearch(domain);
+
+  if (hunterEmail) {
+    return {
+      website: discoveredWebsite,
+
+      email: hunterEmail,
+
+      emailSource: null,
+
+      status: "found",
+
+      message:
+        "Public business email found via email lookup service."
+    };
   }
 
   return {
