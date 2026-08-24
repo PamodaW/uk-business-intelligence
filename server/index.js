@@ -73,15 +73,14 @@ app.get("/api/health", (req, res) =>
   res.json({ ok: true, time: new Date().toISOString() }),
 );
 
-app.get("/api/companies", (req, res) => {
+function buildCompanyWhere(q) {
   const {
     query = "",
     category = "",
     location = "",
     from = "",
     to = "",
-    limit = "100",
-  } = req.query;
+  } = q;
   const where = [],
     args = [];
   if (query) {
@@ -104,11 +103,16 @@ app.get("/api/companies", (req, res) => {
     where.push("incorporation_date<=?");
     args.push(to);
   }
-  const sql = `SELECT * FROM companies ${where.length ? "WHERE " + where.join(" AND ") : ""} ORDER BY incorporation_date DESC, company_name LIMIT ?`;
-  args.push(Math.min(Number(limit) || 100, 500));
+  return { where: where.length ? "WHERE " + where.join(" AND ") : "", args };
+}
+
+app.get("/api/companies", (req, res) => {
+  const { limit = "100" } = req.query;
+  const { where, args } = buildCompanyWhere(req.query);
+  const sql = `SELECT * FROM companies ${where} ORDER BY incorporation_date DESC, company_name LIMIT ?`;
   const rows = db
     .prepare(sql)
-    .all(...args)
+    .all(...args, Math.min(Number(limit) || 100, 500))
     .map(rowToJson);
   res.json({ items: rows, total: rows.length });
 });
@@ -199,18 +203,31 @@ app.patch("/api/leads/:number", (req, res) => {
 });
 
 app.get("/api/export.csv", (req, res) => {
+  const { where, args } = buildCompanyWhere(req.query);
   const rows = db
     .prepare(
-      "SELECT company_name,company_number,incorporation_date,category,address,website,email,email_status,lead_score,lead_status FROM companies ORDER BY incorporation_date DESC",
+      `SELECT company_name,company_number,incorporation_date,category,address,website,email,email_status,lead_score,lead_status FROM companies ${where} ORDER BY incorporation_date DESC`,
     )
-    .all();
-  const headers = Object.keys(rows[0] || { company_name: "" });
+    .all(...args);
+  const headers = [
+    "company_name",
+    "company_number",
+    "incorporation_date",
+    "category",
+    "address",
+    "website",
+    "email",
+    "email_status",
+    "lead_score",
+    "lead_status",
+  ];
   const esc = (v) => `"${String(v ?? "").replaceAll('"', '""')}"`;
   const csv = [
     headers.join(","),
     ...rows.map((r) => headers.map((h) => esc(r[h])).join(",")),
   ].join("\n");
   res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Cache-Control", "no-store");
   res.setHeader(
     "Content-Disposition",
     "attachment; filename=uk-business-leads.csv",

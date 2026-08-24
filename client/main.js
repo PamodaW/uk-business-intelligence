@@ -2,7 +2,7 @@ const state={items:[],selected:null};
 const app=document.querySelector("#app");
 app.innerHTML=`
 <div class="shell">
-<header class="top"><div class="brand"><div class="logo">UK</div><div><b>Business Intelligence</b><span>New company prospecting</span></div></div><div class="actions"><button class="btn" id="presentation">Presentation</button><button class="btn" id="export">Export CSV</button><button class="btn primary" id="sync">Sync Companies</button></div></header>
+<header class="top"><div class="brand"><div class="logo">UK</div><div><b>Business Intelligence</b><span>New company prospecting</span></div></div><div class="actions"><button class="btn" id="presentation">Presentation</button><button class="btn" id="export">Export CSV</button><button class="btn" id="syncEmails">Find All Emails</button><button class="btn primary" id="sync">Sync Companies</button></div></header>
 <main class="main">
 <section class="hero"><div><div class="eyebrow">Executive prospecting dashboard</div><h1>Find the next UK business opportunity.</h1><p>Discover newly incorporated companies, enrich public contact details, score potential opportunities and present the strongest leads without opening a spreadsheet.</p></div></section>
 <section class="stats">
@@ -17,7 +17,7 @@ app.innerHTML=`
 <input class="input" id="from" type="date" aria-label="From date">
 <input class="input" id="to" type="date" aria-label="To date">
 </section>
-<section class="panel"><table class="table"><thead><tr><th>Company</th><th>Business</th><th>Industry</th><th>Contact</th><th>Score</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="loading">Loading...</td></tr></tbody></table></section>
+<section class="panel"><table class="table"><thead><tr><th>Company</th><th>Business</th><th>Industry</th><th>Website</th><th>Contact</th><th>Score</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody></table></section>
 </main><div class="detailBackdrop" id="detailBackdrop"></div><aside class="detail" id="detail"></aside><div class="toast" id="toast"></div></div>`;
 
 const $=s=>document.querySelector(s);
@@ -27,7 +27,7 @@ function score(x){if(x.lead_score)return x.lead_score;let n=35;if(x.category==="
 function render(){
  const q=$("#search").value.toLowerCase(),cat=$("#category").value,from=$("#from").value,to=$("#to").value;
  const items=state.items.filter(x=>(!q||`${x.company_name} ${x.notes}`.toLowerCase().includes(q))&&(!cat||x.category===cat)&&(!from||x.incorporation_date>=from)&&(!to||x.incorporation_date<=to));
- $("#rows").innerHTML=items.length?items.map(x=>`<tr><td><button class="rowbtn" data-company="${x.company_number}"><div class="company">${x.company_name}</div><div class="sub">${x.company_number} · ${x.incorporation_date||"—"}</div></button></td><td>${x.notes||"Business profile not yet enriched."}</td><td><span class="badge">${x.category||"Other"}</span></td><td>${x.email?`<span class="email">✉ ${x.email}</span>`:"<span class=\"muted\">No public email</span>"}</td><td class="score">${score(x)}</td><td><span class="badge">${x.lead_status||"new"}</span></td></tr>`).join(""):`<tr><td colspan="6" class="empty">No companies match your filters.</td></tr>`;
+ $("#rows").innerHTML=items.length?items.map(x=>`<tr><td><button class="rowbtn" data-company="${x.company_number}"><div class="company">${x.company_name}</div><div class="sub">${x.company_number} · ${x.incorporation_date||"—"}</div></button></td><td>${x.notes||"Business profile not yet enriched."}</td><td><span class="badge">${x.category||"Other"}</span></td><td>${x.website?`<a href="${x.website}" target="_blank" rel="noreferrer">${x.website.replace(/^https?:\/\//,"")}</a>`:"<span class=\"muted\">—</span>"}</td><td>${x.email?`<span class="email">✉ ${x.email}</span>`:"<span class=\"muted\">No public email</span>"}</td><td class="score">${score(x)}</td><td><span class="badge">${x.lead_status||"new"}</span></td></tr>`).join(""):`<tr><td colspan="7" class="empty">No companies match your filters.</td></tr>`;
  $("#sTotal").textContent=state.items.length;
  $("#sTech").textContent=state.items.filter(x=>x.category==="Technology").length;
  $("#sEmails").textContent=state.items.filter(x=>x.email).length;
@@ -48,9 +48,36 @@ async function openDetail(num){
  $("#ch").addEventListener("click",()=>window.open(`https://find-and-update.company-information.service.gov.uk/company/${num}`,"_blank"));
  $("#leadStatus").addEventListener("change",async e=>{await api(`/api/leads/${num}`,{method:"PATCH",body:JSON.stringify({lead_status:e.target.value})});toast("Lead status updated");load()});
 }
+function filterParams(){const p=new URLSearchParams();const q=$("#search").value,cat=$("#category").value,from=$("#from").value,to=$("#to").value;if(q)p.set("query",q);if(cat)p.set("category",cat);if(from)p.set("from",from);if(to)p.set("to",to);return p.toString()}
 $("#search").addEventListener("input",render);$("#category").addEventListener("change",render);$("#from").addEventListener("change",render);$("#to").addEventListener("change",render);
-$("#export").addEventListener("click",()=>window.open("/api/export.csv","_blank"));
+$("#export").addEventListener("click",()=>{const qs=filterParams();window.open(`/api/export.csv${qs?`?${qs}`:""}`,"_blank")});
 $("#sync").addEventListener("click",async()=>{try{const from=$("#from").value||new Date(Date.now()-7*864e5).toISOString().slice(0,10);const to=$("#to").value||new Date().toISOString().slice(0,10);const r=await api("/api/companies/sync",{method:"POST",body:JSON.stringify({from,to,limit:100})});toast(`${r.imported} companies synced`);load()}catch(e){toast(e.message)}});
+$("#syncEmails").addEventListener("click",async()=>{
+ const btn=$("#syncEmails");
+ const targets=state.items.filter(x=>!x.email);
+ if(!targets.length){toast("Every company already has a public email on file");return}
+ btn.disabled=true;
+ let done=0,found=0;
+ const CONCURRENCY=4;
+ async function worker(queue){
+  while(queue.length){
+   const x=queue.shift();
+   try{
+    const r=await api(`/api/companies/${x.company_number}/enrich`,{method:"POST",body:JSON.stringify({})});
+    state.items=state.items.map(i=>i.company_number===x.company_number?r:i);
+    if(r.email)found++;
+   }catch{}
+   done++;
+   btn.textContent=`Finding emails ${done}/${targets.length}...`;
+   render();
+  }
+ }
+ const queue=[...targets];
+ await Promise.all(Array.from({length:Math.min(CONCURRENCY,queue.length)},()=>worker(queue)));
+ btn.disabled=false;
+ btn.textContent="Find All Emails";
+ toast(`Found ${found} of ${targets.length} public emails`);
+});
 $("#presentation").addEventListener("click",()=>document.body.classList.toggle("presentation"));
 $("#detailBackdrop").addEventListener("click",closeDetail);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail()});
