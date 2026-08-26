@@ -2,7 +2,7 @@ const state={items:[],selected:null};
 const app=document.querySelector("#app");
 app.innerHTML=`
 <div class="shell">
-<header class="top"><div class="brand"><div class="logo">UK</div><div><b>Business Intelligence</b><span>New company prospecting</span></div></div><div class="actions"><button class="btn" id="presentation">Presentation</button><button class="btn" id="export">Export CSV</button><button class="btn" id="syncEmails">Find All Emails</button><button class="btn primary" id="sync">Sync Companies</button></div></header>
+<header class="top"><div class="brand"><img class="logo" src="/logo.png" alt="UK Business Intelligence logo"><div><b>Business Intelligence</b><span>New company prospecting</span></div></div><div class="actions"><button class="btn" id="presentation">Presentation</button><button class="btn" id="export">Export CSV</button><button class="btn" id="syncEmails">Find All Emails</button><button class="btn primary" id="sync">Sync Companies</button></div></header>
 <main class="main">
 <section class="hero"><div><div class="eyebrow">Executive prospecting dashboard</div><h1>Find the next UK business opportunity.</h1><p>Discover newly incorporated companies, enrich public contact details, score potential opportunities and present the strongest leads without opening a spreadsheet.</p></div></section>
 <section class="stats">
