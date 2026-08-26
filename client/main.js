@@ -78,7 +78,7 @@ $("#syncEmails").addEventListener("click",async()=>{
  btn.textContent="Find All Emails";
  toast(`Found ${found} of ${targets.length} public emails`);
 });
-$("#presentation").addEventListener("click",()=>document.body.classList.toggle("presentation"));
+$("#presentation").addEventListener("click",()=>{const on=document.body.classList.toggle("presentation");$("#presentation").textContent=on?"Exit Presentation":"Presentation"});
 $("#detailBackdrop").addEventListener("click",closeDetail);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail()});
 load();
