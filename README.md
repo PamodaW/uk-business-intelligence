@@ -34,7 +34,7 @@ Without an API key, the app still runs with demo data so the UI can be presented
 - `PATCH /api/leads/:number`
 - `GET /api/export.csv`
 
-## Email enrichment
+## Email
 For a company with a discoverable website, the backend checks the homepage and common contact/about pages and extracts public `mailto:` links and visible email addresses. It records the source URL. It does not infer `info@`, `hello@`, etc.
 
 ## Companies House
