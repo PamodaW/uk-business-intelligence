@@ -4,8 +4,9 @@ import cors from "cors";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import db from "./db.js";
-import { searchCompanies, getCompany } from "./companies-house.js";
+import { searchCompanies, getCompanyDetails } from "./companies-house.js";
 import { enrichWebsite } from "./enrichment.js";
+import { rescore, rescoreAll, saveCompaniesHouseDetails } from "./leads.js";
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -59,7 +60,30 @@ function inferCategory(text) {
   return "Other";
 }
 function rowToJson(r) {
-  return { ...r, sic_codes: safeJson(r.sic_codes) };
+  return {
+    ...r,
+    sic_codes: safeJson(r.sic_codes),
+    recent_filings: safeJson(r.recent_filings),
+    score_reasons: safeJson(r.score_reasons),
+  };
+}
+function companyWithDetails(number) {
+  const row = db
+    .prepare("SELECT * FROM companies WHERE company_number=?")
+    .get(number);
+  if (!row) return null;
+  const officers = db
+    .prepare(
+      "SELECT name,role,appointed_on,resigned_on,occupation FROM officers WHERE company_number=? ORDER BY resigned_on IS NOT NULL, appointed_on DESC",
+    )
+    .all(number);
+  const pscs = db
+    .prepare(
+      "SELECT name,kind,natures_of_control,notified_on,ceased_on FROM pscs WHERE company_number=? ORDER BY ceased_on IS NOT NULL, notified_on DESC",
+    )
+    .all(number)
+    .map((p) => ({ ...p, natures_of_control: safeJson(p.natures_of_control) }));
+  return { ...rowToJson(row), officers, pscs };
 }
 function safeJson(v) {
   try {
@@ -118,11 +142,9 @@ app.get("/api/companies", (req, res) => {
 });
 
 app.get("/api/companies/:number", (req, res) => {
-  const row = db
-    .prepare("SELECT * FROM companies WHERE company_number=?")
-    .get(req.params.number);
-  if (!row) return res.status(404).json({ error: "Company not found" });
-  res.json(rowToJson(row));
+  const company = companyWithDetails(req.params.number);
+  if (!company) return res.status(404).json({ error: "Company not found" });
+  res.json(company);
 });
 
 app.post("/api/companies/sync", async (req, res) => {
@@ -144,7 +166,7 @@ app.post("/api/companies/sync", async (req, res) => {
         insert.run(
           x.company_number,
           x.company_name,
-          x.company_status,
+          x.status,
           x.incorporation_date,
           x.sic_codes,
           x.address,
@@ -156,6 +178,7 @@ app.post("/api/companies/sync", async (req, res) => {
       .map(mapApiCompany)
       .filter((x) => !new RegExp(`^(${nonEnglandWalesPrefixes.join("|")})`, "i").test(x.company_number));
     tx(mapped);
+    mapped.forEach((x) => rescore(x.company_number));
     res.json({ imported: mapped.length, items: mapped });
   } catch (e) {
     res.status(502).json({ error: e.message });
@@ -181,14 +204,37 @@ app.post("/api/companies/:number/enrich", async (req, res) => {
       result.status,
       req.params.number,
     );
-    res.json({ ...rowToJson(row), ...result });
+    rescore(req.params.number);
+    const fresh = db
+      .prepare("SELECT * FROM companies WHERE company_number=?")
+      .get(req.params.number);
+    res.json({ ...rowToJson(fresh), ...result });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+app.post("/api/companies/:number/companies-house", async (req, res) => {
+  if (!process.env.COMPANIES_HOUSE_API_KEY)
+    return res.status(503).json({
+      error:
+        "Companies House API key is not configured. Add it to Replit Secrets.",
+    });
+  const exists = db
+    .prepare("SELECT 1 FROM companies WHERE company_number=?")
+    .get(req.params.number);
+  if (!exists) return res.status(404).json({ error: "Company not found" });
+  try {
+    const details = await getCompanyDetails(req.params.number);
+    saveCompaniesHouseDetails(req.params.number, details);
+    res.json(companyWithDetails(req.params.number));
+  } catch (e) {
+    res.status(502).json({ error: e.message });
+  }
+});
+
 app.patch("/api/leads/:number", (req, res) => {
-  const allowed = ["lead_status", "lead_score", "notes", "website"];
+  const allowed = ["lead_status", "notes", "website"];
   const updates = Object.entries(req.body || {}).filter(([k]) =>
     allowed.includes(k),
   );
@@ -196,6 +242,7 @@ app.patch("/api/leads/:number", (req, res) => {
     return res.status(400).json({ error: "No editable fields" });
   const sql = `UPDATE companies SET ${updates.map(([k]) => `${k}=?`).join(",")},updated_at=CURRENT_TIMESTAMP WHERE company_number=?`;
   db.prepare(sql).run(...updates.map(([, v]) => v), req.params.number);
+  rescore(req.params.number);
   const row = db
     .prepare("SELECT * FROM companies WHERE company_number=?")
     .get(req.params.number);
@@ -234,6 +281,9 @@ app.get("/api/export.csv", (req, res) => {
   );
   res.send(csv);
 });
+
+// Scores are computed, so bring rows saved by older versions up to date.
+rescoreAll();
 
 app.use(express.static(clientDist));
 app.get("/{*splat}", (req, res) => {
