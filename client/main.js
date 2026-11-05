@@ -2,15 +2,16 @@ const state={items:[],selected:null};
 const app=document.querySelector("#app");
 app.innerHTML=`
 <div class="shell">
-<header class="top"><div class="brand"><img class="logo" src="/logo.png" alt="UK Business Intelligence logo"><div><b>Business Intelligence</b><span>New company prospecting</span></div></div><div class="actions"><button class="btn" id="presentation">Presentation</button><button class="btn" id="export">Export CSV</button><button class="btn" id="syncEmails">Find All Emails</button><button class="btn" id="syncCH">Fetch Companies House Data</button><button class="btn primary" id="sync">Sync Companies</button></div></header>
+<header class="top"><div class="brand"><img class="logo" src="/logo-full.png" alt="UK Business Intelligence"></div><div class="actions"><button class="btn" id="presentation">Presentation</button><button class="btn" id="export">Export CSV</button><button class="btn" id="syncEmails">Find All Emails</button><button class="btn" id="syncCH">Fetch Companies House Data</button><button class="btn primary" id="sync">Sync Companies</button><a class="btn" href="#about">About</a></div></header>
 <main class="main">
-<section class="hero"><div><div class="eyebrow">Executive prospecting dashboard</div><h1>Find the next UK business opportunity.</h1><p>Discover newly incorporated companies, enrich public contact details, score potential opportunities and present the strongest leads without opening a spreadsheet.</p></div></section>
+<section class="hero"><div><div class="eyebrow">Executive prospecting dashboard</div><h1>Find the next <em>UK business</em> opportunity.</h1><p>Discover newly incorporated companies, enrich public contact details, score potential opportunities and present the strongest leads without opening a spreadsheet.</p></div></section>
 <section class="stats">
 <div class="stat"><span>Companies in workspace</span><strong id="sTotal">—</strong></div>
 <div class="stat"><span>Technology leads</span><strong id="sTech">—</strong></div>
 <div class="stat"><span>Public emails</span><strong id="sEmails">—</strong></div>
 <div class="stat"><span>High-potential leads</span><strong id="sHigh">—</strong></div>
 </section>
+<h2 class="sectionTitle">Companies</h2>
 <section class="toolbar">
 <input class="input" id="search" placeholder="Search company or business description...">
 <select class="select" id="category"><option value="">All industries</option><option>Technology</option><option>Professional Services</option><option>Retail / E-commerce</option><option>Property</option><option>Health / Beauty</option><option>Travel / Hospitality</option><option>Logistics</option><option>Other</option></select>
@@ -18,9 +19,40 @@ app.innerHTML=`
 <input class="input" id="to" type="date" aria-label="To date">
 </section>
 <section class="panel"><table class="table"><thead><tr><th>Company</th><th>Business</th><th>Industry</th><th>Website</th><th>Contact</th><th>Score</th><th>Status</th></tr></thead><tbody id="rows"><tr><td colspan="7" class="loading">Loading...</td></tr></tbody></table></section>
-</main><div class="detailBackdrop" id="detailBackdrop"></div><aside class="detail" id="detail"></aside><div class="toast" id="toast"></div></div>`;
+</main>
+<section class="aboutBody" id="about">
+<div class="aboutGrid">
+<div class="reveal"><div class="eyebrow">About the creator</div><h3>Pamoda Wijesinghe</h3><p class="role">Associate Software Engineer</p><div class="aboutPhoto"><img src="/pamoda.jpg" alt="Pamoda Wijesinghe"></div></div>
+<div class="reveal">
+<p class="lead">Associate software engineer with 4+ years of production experience across full-stack engineering and Salesforce platform development.</p>
+<p>On the full-stack side, I build and maintain applications across Node.js/TypeScript backends, React and Angular frontends, and C#/.NET, with a focus on clean REST API design, relational databases and disciplined Git workflows. I work within Agile/Scrum delivery cycles and apply spec-driven development, turning requirements into clear technical specifications before implementation to improve handoffs and reduce rework.</p>
+<p>On the Salesforce side, I build and maintain real org implementations, including custom Apex logic, LWC components, Flow automations and REST integrations, with hands-on delivery in healthcare and legal finance environments.</p>
+<dl class="skills">
+<div><dt>Full-stack</dt><dd><span>Node.js</span><span>TypeScript</span><span>React</span><span>Angular</span><span>C#/.NET</span><span>REST APIs</span><span>PostgreSQL</span><span>MySQL</span><span>SQL Server</span><span>Express</span></dd></div>
+<div><dt>Salesforce</dt><dd><span>Apex</span><span>LWC</span><span>Flow Builder</span><span>SOQL</span><span>Visualforce</span><span>REST integrations</span><span>Salesforce CRM</span></dd></div>
+</dl>
+<div class="aboutLinks"><a class="btn primary" href="https://www.linkedin.com/in/pamoda-wijesinghe" target="_blank" rel="noreferrer">LinkedIn</a><a class="btn" href="https://github.com/PamodaW" target="_blank" rel="noreferrer">GitHub</a></div>
+</div>
+</div>
+</section>
+<section class="exp" id="experience"><div class="expStick"><div class="expText"><h3>Experience across industries</h3><p>Four-plus years of production engineering, from healthcare and legal finance to CRM and enterprise systems.</p></div><div class="expWindow"><div class="expRings"></div><ul class="expList" id="expList"><li>Healthcare platforms</li><li>Legal finance</li><li>CRM systems</li><li>Enterprise .NET</li><li>Full-stack engineering</li><li>Salesforce development</li><li>REST integrations</li><li>Agile delivery</li></ul></div></div></section>
+<div class="detailBackdrop" id="detailBackdrop"></div><aside class="detail" id="detail"></aside><div class="toast" id="toast"></div></div>`;
 
 const $=s=>document.querySelector(s);
+// Rolling-label buttons: the text is duplicated so the old label rotates out as the copy rotates in on hover.
+function rollAll(root=document){
+ root.querySelectorAll(".btn:not([data-roll])").forEach(b=>{
+  const t=b.textContent.trim();
+  b.dataset.roll="1";
+  b.textContent="";
+  const wrap=document.createElement("span");wrap.className="roll";
+  const inner=document.createElement("span");inner.className="rollIn";
+  for(const c of["rollA","rollB"]){const s=document.createElement("span");s.className=c;s.textContent=t;inner.append(s)}
+  wrap.append(inner);b.append(wrap);
+ });
+}
+function setLabel(el,text){const s=el.querySelectorAll(".rollA,.rollB");if(s.length)s.forEach(n=>n.textContent=text);else el.textContent=text}
+rollAll();
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000)}
 async function api(url,opt={}){const r=await fetch(url,{headers:{"Content-Type":"application/json"},...opt});const data=await r.json().catch(()=>({}));if(!r.ok)throw Error(data.error||"Request failed");return data}
 function score(x){return x.lead_score||0}
@@ -55,10 +87,10 @@ async function openDetail(num){
  $("#detail").classList.add("open");
  $("#detailBackdrop").classList.add("show");
  document.body.classList.add("detail-open");
- $("#detail").innerHTML=`<button class="detailClose" id="detailClose" aria-label="Close">✕</button><div class="detailGrid"><div class="detailPanel"><div class="eyebrow">Company profile</div><h2>${x.company_name}</h2><p class="muted">${x.notes||"No detailed public business description yet."}</p><div class="kv"><b>Company number</b><span>${x.company_number}</span></div><div class="kv"><b>Incorporated</b><span>${x.incorporation_date||"—"}</span></div><div class="kv"><b>Industry</b><span>${x.category||"Other"}</span></div><div class="kv"><b>Location</b><span>${x.address||"—"}</span></div><div class="kv"><b>Website</b><span>${x.website?`<a href="${x.website}" target="_blank" rel="noreferrer">${x.website}</a>`:"Not discovered"}</span></div><div class="kv"><b>Public email</b><span>${x.email||"No public email found"}</span></div><div class="kv"><b>Email source</b><span>${x.email_source?`<a href="${x.email_source}" target="_blank" rel="noreferrer">View source page</a>`:"—"}</span></div></div><div class="detailPanel"><div class="eyebrow">Prospecting</div><h2>${score(x)} / 100</h2><p class="muted">Lead score based on available business signals. Review before outreach.</p>${scoreBreakdown(x)}<button class="btn primary" id="enrich">Find public email</button><button class="btn" id="ch" style="margin-left:8px">Companies House</button><button class="btn" id="chSync" style="margin-top:8px">${x.ch_synced_at?"Refresh":"Fetch"} Companies House data</button><div style="margin-top:18px"><label class="muted">Lead status</label><select class="select" id="leadStatus"><option ${x.lead_status==="new"?"selected":""}>new</option><option ${x.lead_status==="qualified"?"selected":""}>qualified</option><option ${x.lead_status==="contacted"?"selected":""}>contacted</option><option ${x.lead_status==="won"?"selected":""}>won</option><option ${x.lead_status==="dismissed"?"selected":""}>dismissed</option></select></div></div><div class="detailPanel"><div class="eyebrow">Companies House</div>${chSection(x)}</div></div>`;
+ $("#detail").innerHTML=`<button class="detailClose" id="detailClose" aria-label="Close">✕</button><div class="detailGrid"><div class="detailPanel"><div class="eyebrow">Company profile</div><h2>${x.company_name}</h2><p class="muted">${x.notes||"No detailed public business description yet."}</p><div class="kv"><b>Company number</b><span>${x.company_number}</span></div><div class="kv"><b>Incorporated</b><span>${x.incorporation_date||"—"}</span></div><div class="kv"><b>Industry</b><span>${x.category||"Other"}</span></div><div class="kv"><b>Location</b><span>${x.address||"—"}</span></div><div class="kv"><b>Website</b><span>${x.website?`<a href="${x.website}" target="_blank" rel="noreferrer">${x.website}</a>`:"Not discovered"}</span></div><div class="kv"><b>Public email</b><span>${x.email||"No public email found"}</span></div><div class="kv"><b>Email source</b><span>${x.email_source?`<a href="${x.email_source}" target="_blank" rel="noreferrer">View source page</a>`:"—"}</span></div></div><div class="detailPanel"><div class="eyebrow">Prospecting</div><h2>${score(x)} / 100</h2><p class="muted">Lead score based on available business signals. Review before outreach.</p>${scoreBreakdown(x)}<button class="btn primary" id="enrich">Find public email</button><button class="btn" id="ch" style="margin-left:8px">Companies House</button><button class="btn" id="chSync" style="margin-top:8px">${x.ch_synced_at?"Refresh":"Fetch"} Companies House data</button><div style="margin-top:18px"><label class="muted">Lead status</label><select class="select" id="leadStatus"><option ${x.lead_status==="new"?"selected":""}>new</option><option ${x.lead_status==="qualified"?"selected":""}>qualified</option><option ${x.lead_status==="contacted"?"selected":""}>contacted</option><option ${x.lead_status==="won"?"selected":""}>won</option><option ${x.lead_status==="dismissed"?"selected":""}>dismissed</option></select></div></div><div class="detailPanel"><div class="eyebrow">Companies House</div>${chSection(x)}</div></div>`;rollAll($("#detail"));
  $("#detailClose").addEventListener("click",closeDetail);
- $("#enrich").addEventListener("click",async()=>{try{$("#enrich").disabled=true;$("#enrich").textContent="Finding public email...";const r=await api(`/api/companies/${num}/enrich`,{method:"POST",body:JSON.stringify({})});state.items=state.items.map(i=>i.company_number===num?r:i);toast(r.email?`Public email found: ${r.email}`:"No public email found");openDetail(num);render()}catch(e){toast(e.message)}finally{$("#enrich").disabled=false;$("#enrich").textContent="Find public email"}});
- $("#chSync").addEventListener("click",async()=>{const b=$("#chSync");try{b.disabled=true;b.textContent="Fetching Companies House data...";const r=await api(`/api/companies/${num}/companies-house`,{method:"POST",body:JSON.stringify({})});state.items=state.items.map(i=>i.company_number===num?r:i);toast("Companies House data updated");openDetail(num);render()}catch(e){toast(e.message);b.disabled=false;b.textContent="Fetch Companies House data"}});
+ $("#enrich").addEventListener("click",async()=>{try{$("#enrich").disabled=true;setLabel($("#enrich"),"Finding public email...");const r=await api(`/api/companies/${num}/enrich`,{method:"POST",body:JSON.stringify({})});state.items=state.items.map(i=>i.company_number===num?r:i);toast(r.email?`Public email found: ${r.email}`:"No public email found");openDetail(num);render()}catch(e){toast(e.message)}finally{$("#enrich").disabled=false;setLabel($("#enrich"),"Find public email")}});
+ $("#chSync").addEventListener("click",async()=>{const b=$("#chSync");try{b.disabled=true;setLabel(b,"Fetching Companies House data...");const r=await api(`/api/companies/${num}/companies-house`,{method:"POST",body:JSON.stringify({})});state.items=state.items.map(i=>i.company_number===num?r:i);toast("Companies House data updated");openDetail(num);render()}catch(e){toast(e.message);b.disabled=false;setLabel(b,"Fetch Companies House data")}});
  $("#ch").addEventListener("click",()=>window.open(`https://find-and-update.company-information.service.gov.uk/company/${num}`,"_blank"));
  $("#leadStatus").addEventListener("change",async e=>{await api(`/api/leads/${num}`,{method:"PATCH",body:JSON.stringify({lead_status:e.target.value})});toast("Lead status updated");load()});
 }
@@ -82,14 +114,14 @@ $("#syncEmails").addEventListener("click",async()=>{
     if(r.email)found++;
    }catch{}
    done++;
-   btn.textContent=`Finding emails ${done}/${targets.length}...`;
+   setLabel(btn,`Finding emails ${done}/${targets.length}...`);
    render();
   }
  }
  const queue=[...targets];
  await Promise.all(Array.from({length:Math.min(CONCURRENCY,queue.length)},()=>worker(queue)));
  btn.disabled=false;
- btn.textContent="Find All Emails";
+ setLabel(btn,"Find All Emails");
  toast(`Found ${found} of ${targets.length} public emails`);
 });
 $("#syncCH").addEventListener("click",async()=>{
@@ -109,17 +141,33 @@ $("#syncCH").addEventListener("click",async()=>{
     ok++;
    }catch(e){lastError=e.message}
    done++;
-   btn.textContent=`Fetching ${done}/${targets.length}...`;
+   setLabel(btn,`Fetching ${done}/${targets.length}...`);
    render();
   }
  }
  const queue=[...targets];
  await Promise.all(Array.from({length:Math.min(CONCURRENCY,queue.length)},()=>worker(queue)));
  btn.disabled=false;
- btn.textContent="Fetch Companies House Data";
+ setLabel(btn,"Fetch Companies House Data");
  toast(ok===targets.length?`Fetched Companies House data for ${ok} companies`:`Fetched ${ok} of ${targets.length}. ${lastError}`);
 });
 $("#presentation").addEventListener("click",()=>document.body.classList.toggle("presentation"));
 $("#detailBackdrop").addEventListener("click",closeDetail);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail()});
+// Experience: scrolling drives the list upward; the line that crosses the highlight position lights up.
+const expEl=$("#experience"),expList=$("#expList"),expItems=[...expList.children];
+function expFrame(){
+ const r=expEl.getBoundingClientRect();
+ const p=Math.min(1,Math.max(0,-r.top/(r.height-innerHeight)));
+ const line=innerHeight*.3;
+ const travel=expList.offsetHeight-expItems[expItems.length-1].offsetHeight;
+ expList.style.transform=`translateY(${-p*travel}px)`;
+ const top=expList.getBoundingClientRect().top;
+ let best=0,bd=1e9;
+ expItems.forEach((li,i)=>{const d=Math.abs(top+li.offsetTop+li.offsetHeight/2-(line+expList.parentElement.getBoundingClientRect().top*0));if(d<bd){bd=d;best=i}});
+ expItems.forEach((li,i)=>li.classList.toggle("active",i===best));
+}
+addEventListener("scroll",expFrame,{passive:true});addEventListener("resize",expFrame);expFrame();
+const io=new IntersectionObserver(es=>es.forEach(x=>{if(x.isIntersecting){x.target.classList.add("in");io.unobserve(x.target)}}),{threshold:.25});
+document.querySelectorAll(".reveal").forEach(n=>io.observe(n));
 load();
