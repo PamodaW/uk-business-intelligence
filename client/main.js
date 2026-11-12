@@ -128,34 +128,6 @@ $("#syncEmails").addEventListener("click",async()=>{
  setLabel(btn,"Find All Emails");
  toast(`Found ${found} of ${targets.length} public emails`);
 });
-$("#syncCH").addEventListener("click",async()=>{
- const btn=$("#syncCH");
- const targets=state.items.filter(x=>!x.ch_synced_at);
- if(!targets.length){toast("Every company already has Companies House data");return}
- btn.disabled=true;
- let done=0,ok=0,lastError="";
- // The server paces Companies House calls to stay inside their rate limit, so a few parallel requests just keeps its queue full.
- const CONCURRENCY=3;
- async function worker(queue){
-  while(queue.length){
-   const x=queue.shift();
-   try{
-    const r=await api(`/api/companies/${x.company_number}/companies-house`,{method:"POST",body:JSON.stringify({})});
-    state.items=state.items.map(i=>i.company_number===x.company_number?r:i);
-    ok++;
-   }catch(e){lastError=e.message}
-   done++;
-   setLabel(btn,`Fetching ${done}/${targets.length}...`);
-   render();
-  }
- }
- const queue=[...targets];
- await Promise.all(Array.from({length:Math.min(CONCURRENCY,queue.length)},()=>worker(queue)));
- btn.disabled=false;
- setLabel(btn,"Fetch Companies House Data");
- toast(ok===targets.length?`Fetched Companies House data for ${ok} companies`:`Fetched ${ok} of ${targets.length}. ${lastError}`);
-});
-$("#presentation").addEventListener("click",()=>document.body.classList.toggle("presentation"));
 $("#detailBackdrop").addEventListener("click",closeDetail);
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeDetail()});
 // Experience: scrolling drives the list upward; the line that crosses the highlight position lights up.
